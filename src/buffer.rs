@@ -2,7 +2,7 @@ pub use data::buffer::{Internal, Settings, Upstream};
 use data::dashboard::BufferAction;
 use data::target::{self, Target};
 use data::user::Nick;
-use data::{buffer, file_transfer, history, message, preview, Config};
+use data::{Config, buffer, file_transfer, history, message, preview};
 use iced::Task;
 
 pub use self::channel::Channel;
@@ -11,9 +11,9 @@ pub use self::highlights::Highlights;
 pub use self::logs::Logs;
 pub use self::query::Query;
 pub use self::server::Server;
+use crate::Theme;
 use crate::screen::dashboard::sidebar;
 use crate::widget::Element;
-use crate::Theme;
 
 pub mod channel;
 pub mod empty;

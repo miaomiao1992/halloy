@@ -4,10 +4,10 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use std::{fmt, io};
 
-use anyhow::{anyhow, bail, Context as ErrorContext, Result};
+use anyhow::{Context as ErrorContext, Result, anyhow, bail};
 use chrono::{DateTime, Utc};
-use futures::{channel::mpsc, Future, FutureExt};
-use irc::proto::{self, command, Command};
+use futures::{Future, FutureExt, channel::mpsc};
+use irc::proto::{self, Command, command};
 use itertools::{Either, Itertools};
 use log::error;
 use tokio::fs;
@@ -22,7 +22,7 @@ use crate::target::{self, Target};
 use crate::time::Posix;
 use crate::user::{Nick, NickRef};
 use crate::{
-    buffer, compression, config, ctcp, dcc, environment, isupport, message, mode, Server, User,
+    Server, User, buffer, compression, config, ctcp, dcc, environment, isupport, message, mode,
 };
 use crate::{file_transfer, server};
 
@@ -1990,6 +1990,8 @@ impl Client {
                                             .collect(),
                                     ));
                                 }
+                                // We don't handle hop when called from on_connect.
+                                crate::command::Internal::Hop(_, _) => (),
                             },
                             Err(_) => (),
                         }
@@ -2757,7 +2759,9 @@ impl Map {
 
     pub fn get_server_chathistory_limit(&self, server: &Server) -> u16 {
         self.client(server)
-            .map_or(CLIENT_CHATHISTORY_LIMIT, |client| client.chathistory_limit())
+            .map_or(CLIENT_CHATHISTORY_LIMIT, |client| {
+                client.chathistory_limit()
+            })
     }
 
     pub fn get_server_supports_chathistory(&self, server: &Server) -> bool {
@@ -2848,12 +2852,10 @@ impl Map {
     }
 
     pub fn status(&self, server: &Server) -> Status {
-        self.0
-            .get(server)
-            .map_or(Status::Unavailable, |s| match s {
-                State::Disconnected => Status::Disconnected,
-                State::Ready(_) => Status::Connected,
-            })
+        self.0.get(server).map_or(Status::Unavailable, |s| match s {
+            State::Disconnected => Status::Disconnected,
+            State::Ready(_) => Status::Connected,
+        })
     }
 
     pub fn tick(&mut self, now: Instant) -> Result<()> {
