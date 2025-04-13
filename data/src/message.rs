@@ -15,17 +15,17 @@ use url::Url;
 
 pub use self::formatting::Formatting;
 pub use self::source::{
-    server::{Kind, StandardReply},
     Source,
+    server::{Kind, StandardReply},
 };
 
-use crate::config::buffer::UsernameFormat;
 use crate::config::Highlights;
+use crate::config::buffer::UsernameFormat;
 use crate::serde::fail_as_none;
 use crate::target::Channel;
 use crate::time::Posix;
 use crate::user::{Nick, NickRef};
-use crate::{ctcp, isupport, target, Config, Server, User};
+use crate::{Config, Server, User, ctcp, isupport, target};
 
 // References:
 // - https://datatracker.ietf.org/doc/html/rfc1738#section-5
@@ -936,41 +936,59 @@ fn target(
             }
         }
         Command::NOTICE(target, text) => {
-            let is_action = is_action(&text);
-            let source = |user| {
-                if is_action {
-                    Source::Action(Some(user))
+            // CTCP Handling.
+            if ctcp::parse_query(&text).is_some() {
+                let user = user?;
+                let target = User::from(Nick::from(target));
+
+                // We want to show both requests, and responses in query with the client.
+                let user = if user.nickname() == *our_nick {
+                    target
                 } else {
-                    Source::User(user)
-                }
-            };
+                    user
+                };
 
-            match (
-                target::Target::parse(&target, chantypes, statusmsg, casemapping),
-                user,
-            ) {
-                (target::Target::Channel(channel), Some(user)) => {
-                    let source = source(resolve_attributes(&user, &channel).unwrap_or(user));
-                    Some(Target::Channel { channel, source })
-                }
-                (target::Target::Query(query), Some(user)) => {
-                    let query = if user.nickname() == *our_nick {
-                        // Notice from ourself, from another client.
-                        query
-                    } else {
-                        // Notice from conversation partner.
-                        target::Query::parse(user.as_str(), chantypes, statusmsg, casemapping)
-                            .ok()?
-                    };
-
-                    Some(Target::Query {
-                        query,
-                        source: source(user),
-                    })
-                }
-                _ => Some(Target::Server {
+                Some(Target::Query {
+                    query: target::Query::from_user(&user, casemapping),
                     source: Source::Server(None),
-                }),
+                })
+            } else {
+                let is_action = is_action(&text);
+                let source = |user| {
+                    if is_action {
+                        Source::Action(Some(user))
+                    } else {
+                        Source::User(user)
+                    }
+                };
+
+                match (
+                    target::Target::parse(&target, chantypes, statusmsg, casemapping),
+                    user,
+                ) {
+                    (target::Target::Channel(channel), Some(user)) => {
+                        let source = source(resolve_attributes(&user, &channel).unwrap_or(user));
+                        Some(Target::Channel { channel, source })
+                    }
+                    (target::Target::Query(query), Some(user)) => {
+                        let query = if user.nickname() == *our_nick {
+                            // Notice from ourself, from another client.
+                            query
+                        } else {
+                            // Notice from conversation partner.
+                            target::Query::parse(user.as_str(), chantypes, statusmsg, casemapping)
+                                .ok()?
+                        };
+
+                        Some(Target::Query {
+                            query,
+                            source: source(user),
+                        })
+                    }
+                    _ => Some(Target::Server {
+                        source: Source::Server(None),
+                    }),
+                }
             }
         }
         Command::CHGHOST(_, _) => Some(Target::Server {
@@ -1228,6 +1246,21 @@ fn content<'a>(
             ))
         }
         Command::NOTICE(target, text) => {
+            if let Some(query) = ctcp::parse_query(text) {
+                let text = &query.params?;
+                let target = Nick::from(target.as_str());
+                let is_response = target != *our_nick;
+                let command = query.command.as_ref();
+
+                if is_response {
+                    return Some(plain(format!(
+                        "Responded to {command} request from {target}"
+                    )));
+                }
+
+                return Some(parse_fragments(format!("{command} {text}")));
+            }
+
             let channel_users = target::Channel::parse(target, chantypes, statusmsg, casemapping)
                 .map(|channel| channel_users(&channel))
                 .unwrap_or_default();

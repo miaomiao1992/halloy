@@ -2,15 +2,15 @@ use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
-use futures::{future, Future, FutureExt};
+use futures::{Future, FutureExt, future};
 use tokio::time::Instant;
 
 use crate::history::{self, History, MessageReferences, ReadMarker};
 use crate::message::{self, Limit};
 use crate::target::{self, Target};
 use crate::user::Nick;
+use crate::{Config, Input, Server, User, server};
 use crate::{buffer, config, input, isupport};
-use crate::{server, Config, Input, Server, User};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Resource {
@@ -713,11 +713,7 @@ impl Data {
                 .map_or_else(
                     || {
                         // Backlog is before this limit view of messages
-                        if has_read_messages {
-                            0
-                        } else {
-                            limited.len()
-                        }
+                        if has_read_messages { 0 } else { limited.len() }
                     },
                     |position| limited.len() - position,
                 )

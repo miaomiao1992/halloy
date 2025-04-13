@@ -5,14 +5,14 @@ use std::sync::LazyLock;
 use data::buffer::{SkinTone, SortDirection};
 use data::isupport::{self, find_target_limit};
 use data::user::User;
-use data::{target, Config};
-use iced::widget::{column, container, row, text, tooltip};
+use data::{Config, target};
 use iced::Length;
+use iced::widget::{column, container, row, text, tooltip};
 use itertools::Itertools;
 use strsim::jaro_winkler;
 
 use crate::theme;
-use crate::widget::{double_pass, Element};
+use crate::widget::{Element, double_pass};
 
 const MAX_SHOWN_COMMAND_ENTRIES: usize = 5;
 const MAX_SHOWN_EMOJI_ENTRIES: usize = 8;
@@ -388,6 +388,7 @@ impl Commands {
                             return whois_command(target_limit);
                         }
                     }
+                    "CTCP" => return ctcp_command(),
                     _ => (),
                 }
 
@@ -606,7 +607,9 @@ impl Command {
             "away" => "Mark yourself as away. If already away, the status is removed",
             "join" => "Join channel(s) with optional key(s)",
             "me" => "Send an action message to the channel",
-            "mode" => "Set mode(s) on a target or retrieve the current mode(s) set. A target can be a channel or an user",
+            "mode" => {
+                "Set mode(s) on a target or retrieve the current mode(s) set. A target can be a channel or an user"
+            }
             "monitor" => "System to notify when users become online/offline",
             "monitor +" => "Add user(s) to list being monitored",
             "monitor -" => "Remove user(s) from list being monitored",
@@ -621,6 +624,7 @@ impl Command {
             "topic" => "Retrieve the topic of a channel or set a new topic",
             "whois" => "Retrieve information about user(s)",
             "format" => "Format text using markdown or $ sequences",
+            "ctcp" => "Send Client-To-Client requests",
 
             _ => return None,
         })
@@ -1018,13 +1022,11 @@ static COMMAND_LIST: LazyLock<Vec<Command>> = LazyLock::new(|| {
         },
         Command {
             title: "NAMES",
-            args: vec![
-                Arg {
-                    text: "channels",
-                    optional: false,
-                    tooltip: Some(String::from("comma-separated")),
-                },
-            ],
+            args: vec![Arg {
+                text: "channels",
+                optional: false,
+                tooltip: Some(String::from("comma-separated")),
+            }],
             subcommands: None,
         },
         Command {
@@ -1066,13 +1068,20 @@ static COMMAND_LIST: LazyLock<Vec<Command>> = LazyLock::new(|| {
         },
         Command {
             title: "FORMAT",
-            args: vec![
-                Arg {
-                    text: "text",
-                    optional: false,
-                    tooltip: Some(include_str!("./format_tooltip.txt").to_string()),
-                },
-            ],
+            args: vec![Arg {
+                text: "text",
+                optional: false,
+                tooltip: Some(include_str!("./format_tooltip.txt").to_string()),
+            }],
+            subcommands: None,
+        },
+        Command {
+            title: "CTCP",
+            args: vec![Arg {
+                text: "channels",
+                optional: false,
+                tooltip: Some(String::from("comma-separated")),
+            }],
             subcommands: None,
         },
     ]
@@ -1845,6 +1854,28 @@ fn whois_command(target_limit: u16) -> Command {
             optional: false,
             tooltip: Some(nicks_tooltip),
         }],
+        subcommands: None,
+    }
+}
+
+fn ctcp_command() -> Command {
+    Command {
+        title: "CTCP",
+        args: vec![
+            Arg {
+                text: "nick",
+                optional: false,
+                tooltip: None,
+            },
+            Arg {
+                text: "command",
+                optional: false,
+                // TODO CASPER: Verify we support this
+                tooltip: Some(
+                    "FINGER, VERSION, SOURCE, USERINFO, CLIENTINFO, PING, TIME".to_string(),
+                ),
+            },
+        ],
         subcommands: None,
     }
 }

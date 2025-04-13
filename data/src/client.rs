@@ -4,10 +4,10 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use std::{fmt, io};
 
-use anyhow::{anyhow, bail, Context as ErrorContext, Result};
+use anyhow::{Context as ErrorContext, Result, anyhow, bail};
 use chrono::{DateTime, Utc};
-use futures::{channel::mpsc, Future, FutureExt};
-use irc::proto::{self, command, Command};
+use futures::{Future, FutureExt, channel::mpsc};
+use irc::proto::{self, Command, command};
 use itertools::{Either, Itertools};
 use log::error;
 use tokio::fs;
@@ -22,7 +22,7 @@ use crate::target::{self, Target};
 use crate::time::Posix;
 use crate::user::{Nick, NickRef};
 use crate::{
-    buffer, compression, config, ctcp, dcc, environment, isupport, message, mode, Server, User,
+    Server, User, buffer, compression, config, ctcp, dcc, environment, isupport, message, mode,
 };
 use crate::{file_transfer, server};
 
@@ -1029,7 +1029,19 @@ impl Client {
                             && ctcp::is_query(text)
                             && !message::is_action(text)
                         {
+                            // Response to us sending a CTCP request to another client
                             if let Some(query) = ctcp::parse_query(text) {
+                                if matches!(&message.command, Command::NOTICE(_, _)) {
+                                    let event = Event::PrivOrNotice(
+                                        message,
+                                        self.nickname().to_owned(),
+                                        self.highlight_notification_blackout.allowed(),
+                                    );
+
+                                    return Ok(vec![event]);
+                                }
+
+                                // Response to a client sending us a CTCP request
                                 if matches!(&message.command, Command::PRIVMSG(_, _)) {
                                     match query.command {
                                         ctcp::Command::Action => (),
@@ -1063,6 +1075,19 @@ impl Client {
                                                     "Halloy {}",
                                                     crate::environment::VERSION
                                                 )),
+                                            ))?;
+                                        }
+                                        ctcp::Command::Time => {
+                                            let utc_time = Utc::now();
+                                            let formatted = utc_time.to_rfc3339_opts(
+                                                chrono::SecondsFormat::Millis,
+                                                true,
+                                            );
+
+                                            self.handle.try_send(ctcp::response_message(
+                                                &query.command,
+                                                user.nickname().to_string(),
+                                                Some(formatted),
                                             ))?;
                                         }
                                         ctcp::Command::Unknown(command) => {
@@ -2740,7 +2765,9 @@ impl Map {
 
     pub fn get_server_chathistory_limit(&self, server: &Server) -> u16 {
         self.client(server)
-            .map_or(CLIENT_CHATHISTORY_LIMIT, |client| client.chathistory_limit())
+            .map_or(CLIENT_CHATHISTORY_LIMIT, |client| {
+                client.chathistory_limit()
+            })
     }
 
     pub fn get_server_supports_chathistory(&self, server: &Server) -> bool {
@@ -2831,12 +2858,10 @@ impl Map {
     }
 
     pub fn status(&self, server: &Server) -> Status {
-        self.0
-            .get(server)
-            .map_or(Status::Unavailable, |s| match s {
-                State::Disconnected => Status::Disconnected,
-                State::Ready(_) => Status::Connected,
-            })
+        self.0.get(server).map_or(Status::Unavailable, |s| match s {
+            State::Disconnected => Status::Disconnected,
+            State::Ready(_) => Status::Connected,
+        })
     }
 
     pub fn tick(&mut self, now: Instant) -> Result<()> {
