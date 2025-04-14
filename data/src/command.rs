@@ -37,7 +37,7 @@ pub enum Irc {
     Notice(String, String),
     Raw(String),
     Unknown(String, Vec<String>),
-    CTCP(ctcp::Command, String),
+    Ctcp(ctcp::Command, String),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -434,7 +434,7 @@ pub fn parse(
                 }
             }
             Kind::Ctcp => validated::<2, 0, true>(args, |[target, command], _| {
-                Ok(Command::Irc(Irc::CTCP(
+                Ok(Command::Irc(Irc::Ctcp(
                     ctcp::Command::from(command.as_str()),
                     target,
                 )))
@@ -508,7 +508,7 @@ impl TryFrom<Irc> for proto::Command {
             Irc::Notice(target, msg) => proto::Command::NOTICE(target, msg),
             Irc::Raw(raw) => proto::Command::Raw(raw),
             Irc::Unknown(command, args) => proto::Command::new(&command, args),
-            Irc::CTCP(command, target) => ctcp::query_command(&command, target, None::<String>),
+            Irc::Ctcp(command, target) => ctcp::query_command(&command, target, None::<String>),
         })
     }
 }
