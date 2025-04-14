@@ -1248,15 +1248,7 @@ fn content<'a>(
         Command::NOTICE(target, text) => {
             if let Some(query) = ctcp::parse_query(text) {
                 let text = &query.params?;
-                let target = Nick::from(target.as_str());
-                let is_response = target != *our_nick;
                 let command = query.command.as_ref();
-
-                if is_response {
-                    return Some(plain(format!(
-                        "Responded to {command} request from {target}"
-                    )));
-                }
 
                 return Some(parse_fragments(format!("{command} {text}")));
             }

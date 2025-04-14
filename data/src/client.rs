@@ -1025,10 +1025,12 @@ impl Client {
                         }
                     } else {
                         // Handle CTCP queries except ACTION and DCC
-                        if user.nickname() != self.nickname()
-                            && ctcp::is_query(text)
-                            && !message::is_action(text)
-                        {
+                        if ctcp::is_query(text) && !message::is_action(text) {
+                            // Ignore CTCP echo
+                            if user.nickname() == self.nickname() {
+                                return Ok(vec![]);
+                            }
+
                             // Response to us sending a CTCP request to another client
                             if let Some(query) = ctcp::parse_query(text) {
                                 if matches!(&message.command, Command::NOTICE(_, _)) {
