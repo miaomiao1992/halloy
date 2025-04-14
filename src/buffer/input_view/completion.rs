@@ -1870,7 +1870,6 @@ fn ctcp_command() -> Command {
             Arg {
                 text: "command",
                 optional: false,
-                // TODO CASPER: Verify we support this
                 tooltip: Some(
                     "FINGER, VERSION, SOURCE, USERINFO, CLIENTINFO, PING, TIME".to_string(),
                 ),
