@@ -1006,7 +1006,12 @@ impl Client {
             }
             Command::PRIVMSG(target, text) | Command::NOTICE(target, text) => {
                 if let Some(user) = message.user() {
-                    if let Some(command) = dcc::decode(text) {
+                    let is_action = message::is_action(text);
+                    let dcc_command = dcc::decode(text);
+                    let ctcp_query = ctcp::parse_query(text);
+
+                    // DCC Handling
+                    if let Some(command) = dcc_command {
                         match command {
                             dcc::Command::Send(request) => {
                                 log::trace!("DCC Send => {request:?}");
@@ -1023,106 +1028,103 @@ impl Client {
                                 bail!("Unsupported DCC command: {command}",);
                             }
                         }
-                    } else {
-                        // Handle CTCP queries except ACTION and DCC
-                        if ctcp::is_query(text) && !message::is_action(text) {
+                    };
+
+                    // CTCP Handling
+                    if let Some(query) = ctcp_query {
+                        dbg!(&message);
+                        dbg!(&is_action);
+                        if !is_action {
                             // Ignore CTCP echo
                             if user.nickname() == self.nickname() {
                                 return Ok(vec![]);
                             }
 
                             // Response to us sending a CTCP request to another client
-                            if let Some(query) = ctcp::parse_query(text) {
-                                if matches!(&message.command, Command::NOTICE(_, _)) {
-                                    let event = Event::PrivOrNotice(
-                                        message,
-                                        self.nickname().to_owned(),
-                                        self.highlight_notification_blackout.allowed(),
-                                    );
+                            if matches!(&message.command, Command::NOTICE(_, _)) {
+                                let event = Event::PrivOrNotice(
+                                    message,
+                                    self.nickname().to_owned(),
+                                    self.highlight_notification_blackout.allowed(),
+                                );
 
-                                    return Ok(vec![event]);
-                                }
+                                return Ok(vec![event]);
+                            }
 
-                                // Response to a client sending us a CTCP request
-                                if matches!(&message.command, Command::PRIVMSG(_, _)) {
-                                    match query.command {
-                                        ctcp::Command::Action => (),
-                                        ctcp::Command::ClientInfo => {
-                                            self.handle.try_send(ctcp::response_message(
-                                                &query.command,
-                                                user.nickname().to_string(),
-                                                Some("ACTION CLIENTINFO DCC PING SOURCE VERSION"),
-                                            ))?;
-                                        }
-                                        ctcp::Command::DCC => (),
-                                        ctcp::Command::Ping => {
-                                            self.handle.try_send(ctcp::response_message(
-                                                &query.command,
-                                                user.nickname().to_string(),
-                                                query.params,
-                                            ))?;
-                                        }
-                                        ctcp::Command::Source => {
-                                            self.handle.try_send(ctcp::response_message(
-                                                &query.command,
-                                                user.nickname().to_string(),
-                                                Some(crate::environment::SOURCE_WEBSITE),
-                                            ))?;
-                                        }
-                                        ctcp::Command::Version => {
-                                            self.handle.try_send(ctcp::response_message(
-                                                &query.command,
-                                                user.nickname().to_string(),
-                                                Some(format!(
-                                                    "Halloy {}",
-                                                    crate::environment::VERSION
-                                                )),
-                                            ))?;
-                                        }
-                                        ctcp::Command::Time => {
-                                            let utc_time = Utc::now();
-                                            let formatted = utc_time.to_rfc3339_opts(
-                                                chrono::SecondsFormat::Millis,
-                                                true,
-                                            );
+                            // Response to a client sending us a CTCP request
+                            if matches!(&message.command, Command::PRIVMSG(_, _)) {
+                                match query.command {
+                                    ctcp::Command::Action => (),
+                                    ctcp::Command::ClientInfo => {
+                                        self.handle.try_send(ctcp::response_message(
+                                            &query.command,
+                                            user.nickname().to_string(),
+                                            Some("ACTION CLIENTINFO DCC PING SOURCE VERSION"),
+                                        ))?;
+                                    }
+                                    ctcp::Command::DCC => (),
+                                    ctcp::Command::Ping => {
+                                        self.handle.try_send(ctcp::response_message(
+                                            &query.command,
+                                            user.nickname().to_string(),
+                                            query.params,
+                                        ))?;
+                                    }
+                                    ctcp::Command::Source => {
+                                        self.handle.try_send(ctcp::response_message(
+                                            &query.command,
+                                            user.nickname().to_string(),
+                                            Some(crate::environment::SOURCE_WEBSITE),
+                                        ))?;
+                                    }
+                                    ctcp::Command::Version => {
+                                        self.handle.try_send(ctcp::response_message(
+                                            &query.command,
+                                            user.nickname().to_string(),
+                                            Some(format!("Halloy {}", crate::environment::VERSION)),
+                                        ))?;
+                                    }
+                                    ctcp::Command::Time => {
+                                        let utc_time = Utc::now();
+                                        let formatted = utc_time
+                                            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
 
-                                            self.handle.try_send(ctcp::response_message(
-                                                &query.command,
-                                                user.nickname().to_string(),
-                                                Some(formatted),
-                                            ))?;
-                                        }
-                                        ctcp::Command::Unknown(command) => {
-                                            log::debug!(
-                                                "Ignorning CTCP command {command}: Unknown command"
-                                            );
-                                        }
+                                        self.handle.try_send(ctcp::response_message(
+                                            &query.command,
+                                            user.nickname().to_string(),
+                                            Some(formatted),
+                                        ))?;
+                                    }
+                                    ctcp::Command::Unknown(command) => {
+                                        log::debug!(
+                                            "Ignorning CTCP command {command}: Unknown command"
+                                        );
                                     }
                                 }
-
-                                return Ok(vec![]);
                             }
+
+                            return Ok(vec![]);
                         }
+                    }
 
-                        // use `target` to confirm the direct message
-                        let direct_message = target == &self.nickname().to_string();
+                    // use `target` to confirm the direct message
+                    let direct_message = target == &self.nickname().to_string();
 
-                        if direct_message {
-                            self.resolved_queries
-                                .replace(target::Query::from_user(&user, self.casemapping()));
-                        }
+                    if direct_message {
+                        self.resolved_queries
+                            .replace(target::Query::from_user(&user, self.casemapping()));
+                    }
 
-                        let event = Event::PrivOrNotice(
-                            message.clone(),
-                            self.nickname().to_owned(),
-                            self.highlight_notification_blackout.allowed(),
-                        );
+                    let event = Event::PrivOrNotice(
+                        message.clone(),
+                        self.nickname().to_owned(),
+                        self.highlight_notification_blackout.allowed(),
+                    );
 
-                        if direct_message {
-                            return Ok(vec![event, Event::DirectMessage(user)]);
-                        } else {
-                            return Ok(vec![event]);
-                        }
+                    if direct_message {
+                        return Ok(vec![event, Event::DirectMessage(user)]);
+                    } else {
+                        return Ok(vec![event]);
                     }
                 }
             }

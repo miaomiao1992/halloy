@@ -1247,8 +1247,12 @@ fn content<'a>(
         }
         Command::NOTICE(target, text) => {
             if let Some(query) = ctcp::parse_query(text) {
-                let text = &query.params?;
                 let command = query.command.as_ref();
+                let text = match &query.params {
+                    Some("") => "(empty)",
+                    Some(text) => text,
+                    None => return None, // Return if we don't have any params.
+                };
 
                 return Some(parse_fragments(format!("{command} {text}")));
             }
