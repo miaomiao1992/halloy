@@ -1006,7 +1006,6 @@ impl Client {
             }
             Command::PRIVMSG(target, text) | Command::NOTICE(target, text) => {
                 if let Some(user) = message.user() {
-                    let is_action = message::is_action(text);
                     let dcc_command = dcc::decode(text);
                     let ctcp_query = ctcp::parse_query(text);
 
@@ -1032,8 +1031,9 @@ impl Client {
 
                     // CTCP Handling
                     if let Some(query) = ctcp_query {
-                        dbg!(&message);
-                        dbg!(&is_action);
+                        let is_action = message::is_action(text);
+
+                        // Ignore CTCP Action queries.
                         if !is_action {
                             // Ignore CTCP echo
                             if user.nickname() == self.nickname() {
