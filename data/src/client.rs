@@ -1031,12 +1031,13 @@ impl Client {
 
                     // CTCP Handling
                     if let Some(query) = ctcp_query {
+                        let is_echo = user.nickname() == self.nickname();
                         let is_action = message::is_action(text);
 
                         // Ignore CTCP Action queries.
                         if !is_action {
                             // Ignore CTCP echo
-                            if user.nickname() == self.nickname() {
+                            if is_echo {
                                 return Ok(vec![]);
                             }
 
@@ -1059,7 +1060,7 @@ impl Client {
                                         self.handle.try_send(ctcp::response_message(
                                             &query.command,
                                             user.nickname().to_string(),
-                                            Some("ACTION CLIENTINFO DCC PING SOURCE VERSION"),
+                                            Some("ACTION CLIENTINFO DCC PING SOURCE VERSION TIME"),
                                         ))?;
                                     }
                                     ctcp::Command::DCC => (),

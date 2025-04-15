@@ -388,7 +388,6 @@ impl Commands {
                             return whois_command(target_limit);
                         }
                     }
-                    "CTCP" => return ctcp_command(),
                     _ => (),
                 }
 
@@ -1077,11 +1076,23 @@ static COMMAND_LIST: LazyLock<Vec<Command>> = LazyLock::new(|| {
         },
         Command {
             title: "CTCP",
-            args: vec![Arg {
-                text: "channels",
-                optional: false,
-                tooltip: Some(String::from("comma-separated")),
-            }],
+            args: vec![
+                Arg {
+                    text: "nick",
+                    optional: false,
+                    tooltip: None,
+                },
+                Arg {
+                    text: "command",
+                    optional: false,
+                    tooltip: Some("ACTION CLIENTINFO PING SOURCE VERSION TIME".to_string()),
+                },
+                Arg {
+                    text: "params",
+                    optional: true,
+                    tooltip: Some("Additional parameters".to_string()),
+                },
+            ],
             subcommands: None,
         },
     ]
@@ -1854,27 +1865,6 @@ fn whois_command(target_limit: u16) -> Command {
             optional: false,
             tooltip: Some(nicks_tooltip),
         }],
-        subcommands: None,
-    }
-}
-
-fn ctcp_command() -> Command {
-    Command {
-        title: "CTCP",
-        args: vec![
-            Arg {
-                text: "nick",
-                optional: false,
-                tooltip: None,
-            },
-            Arg {
-                text: "command",
-                optional: false,
-                tooltip: Some(
-                    "FINGER, VERSION, SOURCE, USERINFO, CLIENTINFO, PING, TIME".to_string(),
-                ),
-            },
-        ],
         subcommands: None,
     }
 }

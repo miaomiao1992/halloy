@@ -1,4 +1,4 @@
-use std::collections::{hash_map, HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque, hash_map};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use std::{convert, slice};
@@ -6,19 +6,19 @@ use std::{convert, slice};
 use chrono::{DateTime, Utc};
 use data::dashboard::{self, BufferAction};
 use data::environment::{RELEASE_WEBSITE, WIKI_WEBSITE};
-use data::history::manager::Broadcast;
 use data::history::ReadMarker;
+use data::history::manager::Broadcast;
 use data::isupport::{self, ChatHistorySubcommand, MessageReference};
 use data::target::{self, Target};
 use data::user::Nick;
 use data::{
-    client, command, config, environment, file_transfer, history, preview, Config, Notification,
-    Server, Version,
+    Config, Notification, Server, Version, client, command, config, environment, file_transfer,
+    history, preview,
 };
 use iced::widget::pane_grid::{self, PaneGrid};
-use iced::widget::{column, container, row, Space};
+use iced::widget::{Space, column, container, row};
 use iced::window::get_position;
-use iced::{clipboard, Length, Task, Vector};
+use iced::{Length, Task, Vector, clipboard};
 use log::{debug, error};
 
 use self::command_bar::CommandBar;
@@ -27,10 +27,10 @@ use self::sidebar::Sidebar;
 use self::theme_editor::ThemeEditor;
 use crate::buffer::{self, Buffer};
 use crate::widget::{
-    anchored_overlay, context_menu, selectable_text, shortcut, Column, Element, Row,
+    Column, Element, Row, anchored_overlay, context_menu, selectable_text, shortcut,
 };
 use crate::window::Window;
-use crate::{event, notification, theme, window, Theme};
+use crate::{Theme, event, notification, theme, window};
 
 mod command_bar;
 pub mod pane;
@@ -333,6 +333,32 @@ impl Dashboard {
                                                 ]),
                                                 None,
                                             );
+                                        }
+                                        buffer::user_context::Event::CtcpRequest(
+                                            command,
+                                            server,
+                                            nick,
+                                            params,
+                                        ) => {
+                                            let buffer =
+                                                pane.buffer.upstream().cloned().unwrap_or_else(
+                                                    || buffer::Upstream::Server(server.clone()),
+                                                );
+
+                                            let command = command::Irc::Ctcp(
+                                                command,
+                                                nick.to_string(),
+                                                params,
+                                            );
+
+                                            let input =
+                                                data::Input::command(buffer.clone(), command);
+
+                                            if let Some(encoded) = input.encoded() {
+                                                clients.send(&input.buffer, encoded);
+                                            }
+
+                                            return (Task::none(), None);
                                         }
                                     }
                                 }
