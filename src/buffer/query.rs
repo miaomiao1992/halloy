@@ -1,13 +1,13 @@
 use data::dashboard::BufferAction;
 use data::target::{self, Target};
-use data::{buffer, history, message, preview, Config, Server};
+use data::{Config, Server, buffer, history, message, preview};
 use iced::advanced::text;
 use iced::widget::{column, container, row, vertical_space};
 use iced::{Length, Task};
 
 use super::{input_view, scroll_view, user_context};
-use crate::widget::{message_content, message_marker, selectable_text, Element};
-use crate::{theme, Theme};
+use crate::widget::{Element, message_content, message_marker, selectable_text};
+use crate::{Theme, theme};
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -23,6 +23,7 @@ pub enum Event {
     PreviewChanged,
     HidePreview(history::Kind, message::Hash, url::Url),
     MarkAsRead(history::Kind),
+    OpenUrl(String),
 }
 
 pub fn view<'a>(
@@ -303,6 +304,7 @@ impl Query {
                         history::Kind::from_buffer(data::Buffer::Upstream(self.buffer.clone()))
                             .map(Event::MarkAsRead)
                     }
+                    scroll_view::Event::OpenUrl(url) => Some(Event::OpenUrl(url)),
                 });
 
                 (command.map(Message::ScrollView), event)

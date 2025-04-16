@@ -20,20 +20,20 @@ use std::collections::HashSet;
 use std::time::{Duration, Instant};
 use std::{env, mem};
 
-use appearance::{theme, Theme};
+use appearance::{Theme, theme};
 use chrono::Utc;
 use data::config::{self, Config};
 use data::history::{self, manager::Broadcast};
 use data::target::{self, Target};
 use data::version::Version;
-use data::{environment, server, version, Notification, Server, Url, User};
+use data::{Notification, Server, Url, User, environment, server, version};
 use iced::widget::{column, container};
-use iced::{padding, Length, Subscription, Task};
+use iced::{Length, Subscription, Task, padding};
 use screen::{dashboard, help, migration, welcome};
 use tokio::runtime;
 use tokio_stream::wrappers::ReceiverStream;
 
-use self::event::{events, Event};
+use self::event::{Event, events};
 use self::modal::Modal;
 use self::notification::Notifications;
 use self::widget::Element;
@@ -43,9 +43,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = env::args();
     args.next();
 
-    let version = args
-        .next()
-        .is_some_and(|s| s == "--version" || s == "-V");
+    let version = args.next().is_some_and(|s| s == "--version" || s == "-V");
 
     if version {
         println!("halloy {}", environment::formatted_version());
@@ -365,6 +363,15 @@ impl Halloy {
                             self.screen = Screen::Exit { pending_exit };
                             Task::none()
                         }
+                    }
+                    Some(dashboard::Event::OpenUrl(url, prompt_before_open)) => {
+                        if prompt_before_open {
+                            self.modal = Some(Modal::PromptBeforeOpenUrl(url));
+                        } else {
+                            let _ = open::that_detached(url);
+                        }
+
+                        Task::none()
                     }
                     None => Task::none(),
                 };

@@ -1,12 +1,12 @@
 use data::dashboard::BufferAction;
 use data::target::Target;
-use data::{client, history, isupport, message, Config};
+use data::{Config, client, history, isupport, message};
 use iced::widget::container;
 use iced::{Length, Task};
 
 use super::{scroll_view, user_context};
-use crate::widget::{message_content, Element};
-use crate::{theme, Theme};
+use crate::widget::{Element, message_content};
+use crate::{Theme, theme};
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -18,6 +18,7 @@ pub enum Event {
     OpenBuffer(Target, BufferAction),
     History(Task<history::manager::Message>),
     MarkAsRead,
+    OpenUrl(String),
 }
 
 pub fn view<'a>(
@@ -98,6 +99,7 @@ impl Logs {
                     scroll_view::Event::PreviewChanged => None,
                     scroll_view::Event::HidePreview(..) => None,
                     scroll_view::Event::MarkAsRead => Some(Event::MarkAsRead),
+                    scroll_view::Event::OpenUrl(url) => Some(Event::OpenUrl(url)),
                 });
 
                 (command.map(Message::ScrollView), event)

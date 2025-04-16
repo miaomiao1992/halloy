@@ -1,12 +1,12 @@
 use data::dashboard::BufferAction;
 use data::target::Target;
-use data::{buffer, history, message, Config};
+use data::{Config, buffer, history, message};
 use iced::widget::{column, container, row, vertical_space};
 use iced::{Length, Task};
 
 use super::{input_view, scroll_view, user_context};
-use crate::widget::{message_content, selectable_text, Element};
-use crate::{theme, Theme};
+use crate::widget::{Element, message_content, selectable_text};
+use crate::{Theme, theme};
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -19,6 +19,7 @@ pub enum Event {
     OpenBuffers(Vec<(Target, BufferAction)>),
     History(Task<history::manager::Message>),
     MarkAsRead(history::Kind),
+    OpenUrl(String),
 }
 
 pub fn view<'a>(
@@ -164,6 +165,7 @@ impl Server {
                         history::Kind::from_buffer(data::Buffer::Upstream(self.buffer.clone()))
                             .map(Event::MarkAsRead)
                     }
+                    scroll_view::Event::OpenUrl(url) => Some(Event::OpenUrl(url)),
                 });
 
                 (command.map(Message::ScrollView), event)

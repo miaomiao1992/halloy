@@ -2,14 +2,14 @@ use data::dashboard::BufferAction;
 use data::server::Server;
 use data::target::{self, Target};
 use data::user::Nick;
-use data::{buffer, history, message, preview, Config, User};
+use data::{Config, User, buffer, history, message, preview};
 use iced::advanced::text;
 use iced::widget::{column, container, row};
-use iced::{padding, Length, Task};
+use iced::{Length, Task, padding};
 
 use super::{input_view, scroll_view, user_context};
-use crate::widget::{message_content, message_marker, selectable_text, Element};
-use crate::{theme, Theme};
+use crate::widget::{Element, message_content, message_marker, selectable_text};
+use crate::{Theme, theme};
 
 mod topic;
 
@@ -29,6 +29,7 @@ pub enum Event {
     PreviewChanged,
     HidePreview(history::Kind, message::Hash, url::Url),
     MarkAsRead(history::Kind),
+    OpenUrl(String),
 }
 
 pub fn view<'a>(
@@ -403,6 +404,7 @@ impl Channel {
                         history::Kind::from_buffer(data::Buffer::Upstream(self.buffer.clone()))
                             .map(Event::MarkAsRead)
                     }
+                    scroll_view::Event::OpenUrl(url) => Some(Event::OpenUrl(url)),
                 });
 
                 (command.map(Message::ScrollView), event)
@@ -440,6 +442,7 @@ impl Channel {
                         Target::Channel(channel),
                         config.actions.buffer.click_channel_name,
                     )]),
+                    topic::Event::OpenUrl(url) => Event::OpenUrl(url),
                 }),
             ),
         }
@@ -494,14 +497,14 @@ fn topic<'a>(
 }
 
 mod nick_list {
-    use data::{config, isupport, target, Config, Server, User};
-    use iced::advanced::text;
-    use iced::widget::{column, scrollable, Scrollable};
+    use data::{Config, Server, User, config, isupport, target};
     use iced::Length;
+    use iced::advanced::text;
+    use iced::widget::{Scrollable, column, scrollable};
     use user_context::Message;
 
     use crate::buffer::user_context;
-    use crate::widget::{selectable_text, Element};
+    use crate::widget::{Element, selectable_text};
     use crate::{font, theme};
 
     pub fn view<'a>(

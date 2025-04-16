@@ -11,6 +11,7 @@ use crate::{Theme, theme};
 pub enum Event {
     UserContext(user_context::Event),
     OpenChannel(target::Channel),
+    OpenUrl(String),
 }
 
 #[derive(Debug, Clone)]
@@ -23,10 +24,7 @@ pub fn update(message: Message) -> Option<Event> {
     match message {
         Message::UserContext(message) => Some(Event::UserContext(user_context::update(message))),
         Message::Link(message::Link::Channel(channel)) => Some(Event::OpenChannel(channel)),
-        Message::Link(message::Link::Url(url)) => {
-            let _ = open::that_detached(url);
-            None
-        }
+        Message::Link(message::Link::Url(url)) => Some(Event::OpenUrl(url)),
         Message::Link(message::Link::User(user)) => Some(Event::UserContext(
             user_context::Event::InsertNickname(user.nickname().to_owned()),
         )),

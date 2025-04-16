@@ -2,7 +2,7 @@ pub use data::buffer::{Internal, Settings, Upstream};
 use data::dashboard::BufferAction;
 use data::target::{self, Target};
 use data::user::Nick;
-use data::{buffer, file_transfer, history, message, preview, Config};
+use data::{Config, buffer, file_transfer, history, message, preview};
 use iced::Task;
 
 pub use self::channel::Channel;
@@ -11,9 +11,9 @@ pub use self::highlights::Highlights;
 pub use self::logs::Logs;
 pub use self::query::Query;
 pub use self::server::Server;
+use crate::Theme;
 use crate::screen::dashboard::sidebar;
 use crate::widget::Element;
-use crate::Theme;
 
 pub mod channel;
 pub mod empty;
@@ -56,6 +56,7 @@ pub enum Event {
     PreviewChanged,
     HidePreview(history::Kind, message::Hash, url::Url),
     MarkAsRead(history::Kind),
+    OpenUrl(String),
 }
 
 impl Buffer {
@@ -131,6 +132,7 @@ impl Buffer {
                         Event::HidePreview(kind, hash, url)
                     }
                     channel::Event::MarkAsRead(kind) => Event::MarkAsRead(kind),
+                    channel::Event::OpenUrl(url) => Event::OpenUrl(url),
                 });
 
                 (command.map(Message::Channel), event)
@@ -143,6 +145,7 @@ impl Buffer {
                     server::Event::OpenBuffers(targets) => Event::OpenBuffers(targets),
                     server::Event::History(task) => Event::History(task),
                     server::Event::MarkAsRead(kind) => Event::MarkAsRead(kind),
+                    server::Event::OpenUrl(url) => Event::OpenUrl(url),
                 });
 
                 (command.map(Message::Server), event)
@@ -160,6 +163,7 @@ impl Buffer {
                         Event::HidePreview(kind, hash, url)
                     }
                     query::Event::MarkAsRead(kind) => Event::MarkAsRead(kind),
+                    query::Event::OpenUrl(url) => Event::OpenUrl(url),
                 });
 
                 (command.map(Message::Query), event)
@@ -179,6 +183,7 @@ impl Buffer {
                     }
                     logs::Event::History(task) => Event::History(task),
                     logs::Event::MarkAsRead => Event::MarkAsRead(history::Kind::Logs),
+                    logs::Event::OpenUrl(url) => Event::OpenUrl(url),
                 });
 
                 (command.map(Message::Logs), event)
@@ -195,6 +200,7 @@ impl Buffer {
                         Event::GoToMessage(server, channel, message)
                     }
                     highlights::Event::History(task) => Event::History(task),
+                    highlights::Event::OpenUrl(url) => Event::OpenUrl(url),
                 });
 
                 (command.map(Message::Highlights), event)
