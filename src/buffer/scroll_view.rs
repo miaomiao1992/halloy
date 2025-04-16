@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Local, NaiveDate, Utc};
 use data::dashboard::BufferAction;
-use data::isupport::ChatHistoryState;
+use data::isupport::{self, ChatHistoryState};
 use data::message::{self, Limit};
 use data::server::Server;
 use data::target::{self, Target};
@@ -90,7 +90,7 @@ pub fn view<'a>(
     state: &State,
     kind: Kind,
     history: &'a history::Manager,
-    previews: Option<&'a preview::Collection>,
+    previews: Option<(&'a preview::Collection, isupport::CaseMap)>,
     chathistory_state: Option<ChatHistoryState>,
     config: &'a Config,
     format: impl Fn(&'a data::Message, Option<f32>, Option<f32>) -> Option<Element<'a, Message>> + 'a,
@@ -167,70 +167,73 @@ pub fn view<'a>(
 
                 *last_date = Some(date);
 
-                let content =
-                    if let (message::Content::Fragments(fragments), Some(previews), true) =
-                        (&message.content, previews, config.preview.enabled)
-                    {
-                        let urls = fragments
-                            .iter()
-                            .filter_map(message::Fragment::url)
-                            .cloned()
-                            .collect::<Vec<_>>();
+                let content = if let (
+                    message::Content::Fragments(fragments),
+                    Some((previews, casemapping)),
+                    true,
+                ) = (&message.content, previews, config.preview.enabled)
+                {
+                    let urls = fragments
+                        .iter()
+                        .filter_map(message::Fragment::url)
+                        .cloned()
+                        .collect::<Vec<_>>();
 
-                        if !urls.is_empty() {
-                            let is_message_visible =
-                                state.visible_url_messages.contains_key(&message.hash);
+                    if !urls.is_empty() {
+                        let is_message_visible =
+                            state.visible_url_messages.contains_key(&message.hash);
 
-                            let element = if is_message_visible {
-                                notify_visibility(
-                                    element,
-                                    2000.0,
-                                    notify_visibility::When::NotVisible,
-                                    Message::ExitingViewport(message.hash),
-                                )
-                            } else {
-                                notify_visibility(
-                                    element,
-                                    1000.0,
-                                    notify_visibility::When::Visible,
-                                    Message::EnteringViewport(message.hash, urls.clone()),
-                                )
-                            };
+                        let element = if is_message_visible {
+                            notify_visibility(
+                                element,
+                                2000.0,
+                                notify_visibility::When::NotVisible,
+                                Message::ExitingViewport(message.hash),
+                            )
+                        } else {
+                            notify_visibility(
+                                element,
+                                1000.0,
+                                notify_visibility::When::Visible,
+                                Message::EnteringViewport(message.hash, urls.clone()),
+                            )
+                        };
 
-                            let mut column = column![element];
+                        let mut column = column![element];
 
-                            for (idx, url) in urls.into_iter().enumerate() {
-                                if message.hidden_urls.contains(&url) {
-                                    continue;
-                                }
-
-                                if let (true, Some(preview::State::Loaded(preview))) =
-                                    (is_message_visible, previews.get(&url))
-                                {
-                                    let is_hovered = state
-                                        .hovered_preview
-                                        .is_some_and(|(a, b)| a == message.hash && b == idx);
-
-                                    column = column.push_maybe(preview_row(
-                                        message,
-                                        preview,
-                                        &url,
-                                        idx,
-                                        max_nick_width,
-                                        max_prefix_width,
-                                        is_hovered,
-                                        config,
-                                    ));
-                                }
+                        for (idx, url) in urls.into_iter().enumerate() {
+                            if message.hidden_urls.contains(&url) {
+                                continue;
                             }
 
-                            column.into()
-                        } else {
-                            element
+                            if let (true, Some(preview::State::Loaded(preview))) =
+                                (is_message_visible, previews.get(&url))
+                            {
+                                let is_hovered = state
+                                    .hovered_preview
+                                    .is_some_and(|(a, b)| a == message.hash && b == idx);
+
+                                column = column.push_maybe(preview_row(
+                                    message,
+                                    preview,
+                                    &url,
+                                    idx,
+                                    max_nick_width,
+                                    max_prefix_width,
+                                    is_hovered,
+                                    config,
+                                    casemapping,
+                                ));
+                            }
                         }
+
+                        column.into()
                     } else {
                         element
-                    };
+                    }
+                } else {
+                    element
+                };
 
                 if is_new_day && config.buffer.date_separators.show {
                     Some(
@@ -1015,6 +1018,7 @@ fn preview_row<'a>(
     max_prefix_width: Option<f32>,
     is_hovered: bool,
     config: &'a Config,
+    casemapping: isupport::CaseMap,
 ) -> Option<Element<'a, Message>> {
     let target = match &message.target {
         message::Target::Channel { channel, .. } => channel.to_target(),
@@ -1032,7 +1036,7 @@ fn preview_row<'a>(
             canonical_url,
             ..
         }) => {
-            if !config.preview.card.visible(&target) {
+            if !config.preview.card.visible(&target, casemapping) {
                 return None;
             }
 
@@ -1066,7 +1070,7 @@ fn preview_row<'a>(
             )
         }
         data::Preview::Image(preview::Image { path, url, .. }) => {
-            if !config.preview.image.visible(&target) {
+            if !config.preview.image.visible(&target, casemapping) {
                 return None;
             }
 
